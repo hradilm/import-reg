@@ -28,7 +28,6 @@ $regFile = $args[0]
 
 $regList = Get-Content -Path $regFile
 
-$line = ""
 $path = ""
 $key = ""
 $value = ""
@@ -44,43 +43,54 @@ foreach ($line in $regList) {
             $key = $key.Substring(1, $key.Length-2)
             $type = $value -split ":"
             $dummy,$splitValue = $value -split ":"
-            Switch ($type[0]) {
-                "dword" {
-                    $regType = "DWord"
-                    [int32]$regValue = "0x"+$splitValue
-                }
-                "hex" {
-                    $regType = "Binary"
-                    [byte[]]$regValue = $splitValue.Split(",")
-                }
-                "hex(b)" {
-                    $regType = "Qword"
-                    $number = ""
-                    foreach ($byte in $splitValue.Split(",")) {
-                        $number = $byte + $number
+            $regValue = $null
+            try {
+                Switch ($type[0]) {
+                    "dword" {
+                        $regType = "DWord"
+                        [int32]$regValue = "0x"+$splitValue
                     }
-                    
-                    [uint64]$regValue = "0x"+$number
+                    "hex" {
+                        $regType = "Binary"
+                        [byte[]]$regValue = $splitValue.Split(",")
+                    }
+                    "hex(b)" {
+                        $regType = "Qword"
+                        $number = ""
+                        foreach ($byte in $splitValue.Split(",")) {
+                            $number = $byte + $number
+                        }
+
+                        [uint64]$regValue = "0x"+$number
+                    }
+                    "hex(7)" {
+                        $regType = "MultiString"
+                        [string[]]$regValue = numberArray2unicodeString $splitValue
+                    }
+                    "hex(2)" {
+                        $regType = "ExpandString"
+                        [string]$regValue = numberArray2unicodeString $splitValue
+                    }
+                    Default {
+                        $regType = "String"
+                        # strip quotations
+                        [string]$regValue = $value.Substring(1, $value.Length-2)
+                    }
                 }
-                "hex(7)" {
-                    $regType = "MultiString"
-                    [string[]]$regValue = numberArray2unicodeString $splitValue
-                }
-                "hex(2)" {
-                    $regType = "ExpandString"
-                    [string]$regValue = numberArray2unicodeString $splitValue
-                }
-                Default {
-                    $regType = "String"
-                    # strip quotations
-                    [string]$regValue = $value.Substring(1, $value.Length-2)
-                }
+            } catch {
+                $message = $_
+                Write-Host "!!! Error when processing !!!`nPath:${path}`nKey:${key}`n$message"
             }
 
             if(!(Test-Path $path)) {
                 New-Item -Path $path -Force
             }
-            Set-ItemProperty -Path $path -Name $key -Value $regValue -Type $regType -Force
+            try {
+                Set-ItemProperty -Path $path -Name $key -Value $regValue -Type $regType -Force
+            } catch {
+                $message = $_
+                Write-Host "!!! Error when setting !!!`nPath:${path}`nKey:${key}`nValue:${regValue}`n$message"
+            }
         }
     }
 }
