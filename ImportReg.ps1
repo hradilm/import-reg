@@ -52,7 +52,10 @@ foreach ($line in $regList) {
                     }
                     "hex" {
                         $regType = "Binary"
-                        [byte[]]$regValue = $splitValue.Split(",")
+                        [byte[]]$regValue = @()
+                        foreach ($byte in $splitValue.Split(",")) {
+                            $regValue = $regValue + [uint32]("0x"+$byte)
+                        }
                     }
                     "hex(b)" {
                         $regType = "Qword"
