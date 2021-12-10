@@ -9,7 +9,7 @@ function numberArray2unicodeString {
     foreach ($byte in $numberArray.Split(",")) {
         $charCode = $byte + $charCode
         if ($charCode.Length -eq 4) {
-            if ([int]$charCode -eq 0) {
+            if ([int]("0x" + $charCode) -eq 0) {
                 if ($string) {
                     $mstring += $string
                     $string = ""
@@ -23,6 +23,21 @@ function numberArray2unicodeString {
 
     Write-Output $mstring
 }
+function trimLine {
+    param (
+        $inputString
+    )
+
+    $outputString = $inputString
+
+    if ($outputString[-1] -eq "\") {
+        $outputString = $outputString.substring(0, $outputString.Length-1)
+    }
+
+    $outputString = $outputString.Trim()
+
+    Write-Output $outputString
+}
 
 $regFile = $args[0]
 
@@ -31,12 +46,25 @@ $regList = Get-Content -Path $regFile
 $path = ""
 $key = ""
 $value = ""
+$multiLine = $false
 
 foreach ($line in $regList) {
     if ($line[0] -eq "[") {
         $path = $line.Substring(1, $line.Length-2)
         $path = $path.Replace("HKEY_LOCAL_MACHINE", "HKLM:")
+    } elseif ($line[-1] -eq "\") {
+        if ($multiLine) {
+            $longLine += trimLine($line)
+        } else {
+            $longLine = trimLine($line)
+            $multiLine = $true
+        }
     } else {
+        if ($multiLine) {
+            $longLine += trimLine($line)
+            $line = $longLine
+            $multiLine = $false
+        }
         if ($path -and $line) {
             $key,$value= $line -split "="
             # strip quotations
